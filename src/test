@@ -1,0 +1,101 @@
+var mutex: semaphore = 1           // Provides mutual exclusion for counters and boolean variables.
+    LoadOnBridge: integer = 0      // The current load on the bridge.  Value ranges from 0 to 8.
+    NumTrucksWaiting: integer = 0  // The number of trucks that are waiting.
+    NumCarsWaiting: integer = 0    // The number of cars that are waiting.
+    BridgeWait: semaphore = 0      // Cars and trucks wait here, if the bridge is full when they arrive.
+    TruckSecondHalf: semaphore = 0 // A truck executes Acquire(BridgeWait) and then Acquire(TruckSecondHalf).
+    TruckHalfOn: boolean = false   // TruckHalfOn is true when a truck has completed Acquire(BridgeWait) and
+                                   // is waiting at Acquire(TruckSecondHalf).
+    BridgeSignalReceived: semaphore = 0  // When a process gets past Acquire(BridgeWait), it replies
+                                   // with Release(BridgeSignalReceived).  This sort of signal+reply
+                                   // arrangement is called "handshaking".
+    TruckSignalReceived: semaphore = 0  // When a process gets past Acquire(TruckSecondHalf), it replies
+                                   // with Release(TruckSignalReceived).
+
+
+             Car  process
+             ------------
+loop
+   sleep(long time)
+   Acquire(mutex)
+   if LoadOnBridge==8 {
+       NumCarsWaiting++
+       Release(mutex)
+
+       // Wait until the car can get onto the bridge.
+       // You may be surprised to see that the next lines of code update NumCarsWaiting without
+       // first executing Acquire(mutex).  Here's how this works: some other
+       // process executes Acquire(mutex) and then calls procedure TakeLoadOffBridge().
+       // That procedure executes "Release(BridgeWait)" followed by "Acquire(BridgeSignalReceived)".
+       // So in our code here, once we got past the Acquire(BridegeWait), we know that the
+       // other process is holding mutex, and doing nothing until we execute "Release(BridgeSignalReceived)".
+       Acquire(BridgeWait)    // We wait here until some process executes Release (BridgeWait).
+       NumCarsWaiting--
+       Release(BridgeSignalReceived)  // The process that is holding mutex can now continue.
+       }
+   else { // The car does not have to wait.  Get onto the bridge.
+       LoadOnBridge++
+       Release(mutex)
+       }
+
+   sleep(short time)  // now the car is on the bridge
+
+   Acquire(mutex)
+   TakeLoadOffBridge()  // This procedure is defined below
+   Release(mutex)
+end loop
+
+             Truck  process
+             --------------
+loop
+   sleep(long time)
+   Acquire(mutex)
+   if LoadOnBridge>=7 {
+       NumTrucksWaiting++
+       Release(mutex)
+
+       // Wait until the first half of the truck can get onto the bridge.
+       Acquire(BridgeWait)    // The process that executes Release(BridgeWait) holds mutex.
+       TruckHalfOn = true
+       Release(BridgeSignalReceived)  // The process that is holding mutex can now continue.
+
+       // Wait until the second half of the truck can get onto the bridge.
+       Acquire(TruckSecondHalf)    // The process that executes Release(TruckSecondHalf) holds mutex.
+       TruckHalfOn = false
+       NumTrucksWaiting--
+       Release(TruckSignalReceived)   // The process that holds mutex can now continue
+       }
+   else { // The truck does not have to wait.  Get onto the bridge.
+       LoadOnBridge = LoadOnBridge+2
+       Release(mutex)
+       }
+
+   sleep(short time)  // now the truck is on the bridge
+
+   Acquire(mutex)
+   TakeLoadOffBridge()  // This procedure is defined below
+   TakeLoadOffBridge()
+   Release(mutex)
+end loop
+
+
+            Procedure TakeLoadOffBridge
+            ---------------------------
+// The calling process already holds mutex, at the time that TakeLoadOffBridge() is called
+Procedure TakeLoadOffBridge() {
+   if TruckHalfOn {
+       Release(TruckSecondHalf)   // Let the truck get completely onto the bridge
+                                  // LoadOnBridge does not have to be changed: the second half of the truck
+                                  // replaces the load we are taking off of the bridge.
+       Acquire(TruckSignalReceived) // Wait until the truck process finishes updating shared variables.
+                                  // (Next, we will exit procedure TakeLoadOffBridge, and release mutex.)
+       }
+   else if (NumTrucksWaiting>0 || NumCarsWaiting>0) {
+       Release(BridgeWait)        // Let a car enter the bridge, or a truck half-enter the bridge.
+                                  // LoadOnBridge does not have to be changed: the new car or half-truck
+                                  // replaces the load we are taking off of the bridge.
+       Acquire(BridgeSignalReceived)// Wait until the car or truck finishes updating shared variables.
+       }
+   else
+       LoadOnBridge=LoadOnBridge-1
+   }  // end of procedure TakeLoadOffBridge
