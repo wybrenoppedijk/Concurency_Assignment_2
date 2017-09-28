@@ -64,7 +64,7 @@ public class RopeBridge {
 							mutex.acquire();
 							peopleOnBridgeCounter--;
 
-							if (monoploizeCounter <= 7 || legthOfOtherQueue(bridgeDirection) == 0 || legthOfQueue(direction) != 0 ){ // wat doet de laatste tread
+							if (monoploizeCounter <= 7 && legthOfQueue(direction) != 0 || legthOfOtherQueue(bridgeDirection) == 0 ){ // wat doet de laatste tread
 								if (direction == 1) {
 									mutex.release();
 									peopleOnTheLeft.release();
@@ -103,7 +103,6 @@ public class RopeBridge {
 				}
 			}
 		}
-
 		private void justLive(){
 			try {
 				System.out.println(getName() + " working/getting education");
