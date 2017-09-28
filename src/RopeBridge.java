@@ -64,7 +64,7 @@ public class RopeBridge {
 							mutex.acquire();
 							peopleOnBridgeCounter--;
 
-							if (monoploizeCounter <= 7 || legthOfOtherQueue(bridgeDirection) == 0 || legthOfOtherQueue(direction) =! 0){
+							if (monoploizeCounter <= 7 || legthOfOtherQueue(bridgeDirection) == 0 || legthOfQueue(direction) != 0 ){ // wat doet de laatste tread
 								if (direction == 1) {
 									mutex.release();
 									peopleOnTheLeft.release();
@@ -128,6 +128,14 @@ public class RopeBridge {
 				}
 			} catch (InterruptedException e) {
 				Thread.currentThread().interrupt();
+			}
+		}
+
+		private int legthOfQueue (int direction){
+			if (direction == 0) {
+				return peopleOnTheRight.getQueueLength();
+			} else {
+				return peopleOnTheLeft.getQueueLength();
 			}
 		}
 
